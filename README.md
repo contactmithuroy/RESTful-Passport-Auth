@@ -1,62 +1,222 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+# Laravel Passport Authentication 
+Laravel Passport provides a full OAuth2 server implementation for your Laravel application in a matter of minutes. Passport is built on top of the League OAuth2 server that is maintained by Andy Millington and Simon Hamp.
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+### You have to just follow a few steps to get following web services
+##### Login API
+##### Details API
 
-## About Laravel
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Getting Started
+## Step 2:Install Laravel Passport.
 
-## Learning Laravel
+````
+composer require laravel/passport
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+````
+## Step 4:Run your database migrations.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+````
+php artisan migrate
 
-## Laravel Sponsors
+````
+## Step 4: Next, you should execute the passport:install Artisan command.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+````
+php artisan passport:install
 
-### Premium Partners
+````
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
+## Step 5:Add the passport on User Model .
 
-## Contributing
+````
+use Illuminate\Notifications\Notifiable;
+use Laravel\Passport\HasApiTokens;
+...
+...
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
 
-## Code of Conduct
+class User extends Authenticatable
+{
+    use HasApiTokens, HasFactory, Notifiable;
+  'password',
+    ];
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+````
 
-## Security Vulnerabilities
+## Step 6: GO Provider AuthProvider and set.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+````
+use Laravel\Passport\Passport;
+...
+...
+ public function boot()
+    {
+       $this->registerPolicies();
 
-## License
+        if (! $this->app->routesAreCached()) {
+            Passport::routes();
+        }
+    }
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+````
+## Step 6: GO Config auth.php and set.
+
+````
+'api' => [
+            'driver' => 'passport',
+            'provider' => 'users',
+            // 'hash' => false,
+        ],
+
+````
+## Step 7:Let's create a Controller for userCOntroller
+
+```
+php artisan make:controller UserController
+````
+
+## Step 8:Now let's Create Registraion and Login function on using UserController
+
+```javascript 
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Laravel\Passport\HasApiTokens;
+use Illuminate\Support\Facades\Hash;
+use Validator;
+...
+...
+
+class UserController extends Controller
+{
+    public function register(Request $request){
+        $rules = [
+            'name'=>'required|max:55',
+            'email'=>'required|email',
+            'password'=>'required',
+        ];
+
+        $validator = Validator::make($request->all(),$rules);
+
+        if($validator->fails()){
+
+            return response()->json($validator->errors(),202);
+
+        }else{
+            $user = new User();
+            $user->name = $request->name;
+            $user->email = $request->email;
+            $user->password = Hash::make($request->password);
+            $user->save();
+
+            $accessToken = $user->createToken('authToken')->accessToken;
+            $response = [
+                    'user' => $user,
+                    'access_token' => $accessToken
+                ];
+
+            return response($response, 201);
+        }
+        
+    }
+
+    public function login(Request $request){
+
+        $user= User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response([
+                'message' => ['These credentials do not match our records.']
+            ], 404);
+        }
+    
+        $accessToken = $user->createToken('authToken')->accessToken;
+        $response = [
+                'user' => $user,
+                'access_token' => $accessToken
+            ];
+
+        return response($response, 201);
+    }
+}
+
+````
+
+## Step 9: Now go to api route and create 
+
+```javascript 
+use App\Http\Controllers\UserController;
+...
+...
+
+Route::post('/register',[UserController::class,'registration']);
+
+Route::post('/login',[UserController::class,'login']);
+
+
+````
+
+
+## Step 10:  go to postman and register:
+
+
+```javascript 
+....
+hit then link
+....
+http://127.0.0.1:8000/api/register
+
+write on body this json format data
+....
+{
+	"name":"Ethan Hunt",
+	"email":"ethan@gmail.com",
+	"password":"aaaaaaaa",
+	"c_password":"aaaaaaaa"
+}
+
+````
+
+
+## Step 11: Test with postman, Result will be below
+
+```javascript 
+
+{
+    "user": {
+        "id": 1,
+        "name": "Ethan Hunt",
+        "email": "ethan@gmail.com",
+        "email_verified_at": null,
+        "created_at": null,
+        "updated_at": null
+    },
+    "token": "AbQzDgXa..."
+}
+
+````
+
+## Step 11: Make Details API or any other with secure route  
+
+```javascript 
+
+Route::middleware('auth:api')->get('/get',[UserController::class,'get']);
+
+
+````
+How to login and get others route
+````
+Login route always stay outside
+
+Go Hedder in postman set
+Authorization and toker Beerer 
+[{"key":"Authorization","value":"Bearer 8|8L8XdIE599i3XATYzXTwESON6tLDEeQoXSMKnnFF","description":""}]
+and set your url for operation
+
+If any problem with this Operation go bellow and follow the link
+https://www.youtube.com/watch?v=j-gF5Qwowy4
+
+Good Luck
+Mithu Roy 
+````
